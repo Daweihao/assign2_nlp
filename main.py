@@ -4,10 +4,11 @@ import subprocess
 import re
 import random
 import numpy as np
+from numpy import linalg as LA
 
 
 def read_in_shakespeare():
-  '''Reads in the Shakespeare dataset processesit into a list of tuples.
+  '''Reads in the Shakespeare dataset processes it into a list of tuples.
      Also reads in the vocab and play name lists from files.
 
   Each tuple consists of
@@ -65,9 +66,16 @@ def create_term_document_matrix(line_tuples, document_names, vocab):
 
   vocab_to_id = dict(zip(vocab, range(0, len(vocab))))
   docname_to_id = dict(zip(document_names, range(0, len(document_names))))
+  tdm = np.zeros(shape=(len(vocab),len(document_names)))
+  for line in line_tuples:
+    doc = line[0]
+    y_axis = docname_to_id.get(doc)
+    for i in range(1,len(line)):
+      x_axis = vocab_to_id.get(i)
+      tdm[x_axis,y_axis] += 1
 
   # YOUR CODE HERE
-  return None
+  return tdm
 
 def create_term_context_matrix(line_tuples, vocab, context_window_size=1):
   '''Returns a numpy array containing the term context matrix for the input lines.
@@ -88,7 +96,21 @@ def create_term_context_matrix(line_tuples, vocab, context_window_size=1):
   vocab_to_id = dict(zip(vocab, range(0, len(vocab))))
 
   # YOUR CODE HERE
-  return None
+  tcm = np.zeros(shape=(len(vocab),len(vocab)))
+  for line in line_tuples:
+    sent= line[1]
+    for i in range(0,len(line[1])):
+      left = i - context_window_size
+      right = i + context_window_size
+      left = 0 if left < 0 else left
+      right = len(sent) - 1 if right >= len(sent) else right
+      for j in range(left, right+1):
+        x_axis = vocab_to_id.get(sent[i],None)
+        y_axis = vocab_to_id.get(sent[j],None)
+
+        tcm[x_axis][y_axis] += 1
+
+  return tcm
 
 def create_PPMI_matrix(term_context_matrix):
   '''Given a term context matrix, output a PPMI matrix.
@@ -105,7 +127,18 @@ def create_PPMI_matrix(term_context_matrix):
   '''       
   
   # YOUR CODE HERE
-  return None
+  para = term_context_matrix.shape
+  totals = np.sum(term_context_matrix)
+  ppmi = np.zeros(para)
+  rows = np.sum(term_context_matrix,axis=1)
+  cols = np.sum(term_context_matrix,axis=0)
+  for i in range(0,para[0]):
+    for j in range (0,para[1]):
+      ppmi[i][j] = (term_context_matrix[i][j]+1)/((rows[i]*cols[j])+totals)
+
+  ppmi_final = np.log2(ppmi)
+
+  return ppmi_final
 
 def create_tf_idf_matrix(term_document_matrix):
   '''Given the term document matrix, output a tf-idf weighted version.
@@ -122,7 +155,17 @@ def create_tf_idf_matrix(term_document_matrix):
   '''
 
   # YOUR CODE HERE
-  return None
+  tf_idf_matrix = np.zeros(term_document_matrix.shape)
+  df_raw = term_document_matrix.copy()
+  df_raw[df_raw > 0] = 1
+  df = np.sum(df_raw,axis=1)
+  docs = term_document_matrix.shape[1]
+  idf = np.log(docs[docs>0]/df)
+  print(df,idf)
+  tf = 1+ np.log10(term_document_matrix[term_document_matrix>0])
+  tf_idf_matrix = np.multiply(tf,idf)
+
+  return tf_idf_matrix
 
 def compute_cosine_similarity(vector1, vector2):
   '''Computes the cosine similarity of the two input vectors.
@@ -134,9 +177,9 @@ def compute_cosine_similarity(vector1, vector2):
   Returns:
     A scalar similarity value.
   '''
-  
+  cs = np.dot(vector1,vector2)/(LA.norm(vector1)*LA.norm(vector2))
   # YOUR CODE HERE
-  return -1
+  return cs
 
 def compute_jaccard_similarity(vector1, vector2):
   '''Computes the cosine similarity of the two input vectors.
