@@ -47,6 +47,7 @@ def get_row_vector(matrix, row_id):
 def get_column_vector(matrix, col_id):
   return matrix[:, col_id]
 
+
 def create_term_document_matrix(line_tuples, document_names, vocab):
   '''Returns a numpy array containing the term document matrix for the input lines.
 
@@ -55,7 +56,7 @@ def create_term_document_matrix(line_tuples, document_names, vocab):
     a tokenized line from that document.
     document_names: A list of the document names
     vocab: A list of the tokens in the vocabulary
-    
+
   Let m = len(vocab) and n = len(document_names).
 
   Returns:
@@ -66,13 +67,13 @@ def create_term_document_matrix(line_tuples, document_names, vocab):
 
   vocab_to_id = dict(zip(vocab, range(0, len(vocab))))
   docname_to_id = dict(zip(document_names, range(0, len(document_names))))
-  tdm = np.zeros(shape=(len(vocab),len(document_names)))
+  tdm = np.zeros(shape=(len(vocab), len(document_names)))
   for line in line_tuples:
     doc = line[0]
     y_axis = docname_to_id.get(doc)
-    for i in range(1,len(line)):
-      x_axis = vocab_to_id.get(i)
-      tdm[x_axis,y_axis] += 1
+    for i in range(0, len(line[1])):
+      x_axis = vocab_to_id.get(line[1][i])
+      tdm[x_axis, y_axis] += 1
 
   # YOUR CODE HERE
   return tdm
@@ -134,19 +135,20 @@ def create_PPMI_matrix(term_context_matrix):
   cols = np.sum(term_context_matrix,axis=0)
   for i in range(0,para[0]):
     for j in range (0,para[1]):
-      ppmi[i][j] = (term_context_matrix[i][j]+1)/((rows[i]*cols[j])+totals)
+      ppmi[i][j] = (term_context_matrix[i][j] * totals + 1 ) / ((rows[i] * cols[j]) + totals)
 
   ppmi_final = np.log2(ppmi)
 
   return ppmi_final
 
+
 def create_tf_idf_matrix(term_document_matrix):
   '''Given the term document matrix, output a tf-idf weighted version.
-  
+
   Hint: Use numpy matrix and vector operations to speed up implementation.
 
   Input:
-    term_document_matrix: Numpy array where each column represents a document 
+    term_document_matrix: Numpy array where each column represents a document
     and each row, the frequency of a word in that document.
 
   Returns:
@@ -157,13 +159,18 @@ def create_tf_idf_matrix(term_document_matrix):
   # YOUR CODE HERE
   tf_idf_matrix = np.zeros(term_document_matrix.shape)
   df_raw = term_document_matrix.copy()
+  tf_raw = term_document_matrix.copy()
   df_raw[df_raw > 0] = 1
-  df = np.sum(df_raw,axis=1)
+  df = np.sum(df_raw, axis=1)
   docs = term_document_matrix.shape[1]
-  idf = np.log(docs[docs>0]/df)
-  print(df,idf)
-  tf = 1+ np.log10(term_document_matrix[term_document_matrix>0])
-  tf_idf_matrix = np.multiply(tf,idf)
+  idf = np.log(docs / df[df > 0])
+
+  tf_raw[tf_raw > 0] = np.log10(tf_raw[tf_raw > 0]) + 1
+
+  tf = tf_raw
+
+  for row in range(idf.shape[0]):
+    tf_idf_matrix[row] = tf[row] * idf[row]
 
   return tf_idf_matrix
 
@@ -193,7 +200,12 @@ def compute_jaccard_similarity(vector1, vector2):
   '''
   
   # YOUR CODE HERE
-  return -1
+  # Tanimoto similarity
+  pq = np.dot(vector1,vector2)
+  p_square = LA.norm(vector1)
+  q_square = LA.norm(vector2)
+  js = pq/(p_square+q_square-pq)
+  return js
 
 def compute_dice_similarity(vector1, vector2):
   '''Computes the cosine similarity of the two input vectors.
@@ -207,7 +219,12 @@ def compute_dice_similarity(vector1, vector2):
   '''
 
   # YOUR CODE HERE
-  return -1
+  pq = np.dot(vector1,vector2)
+  p_square = LA.norm(vector1)
+  q_square = LA.norm(vector2)
+  ds = 2*pq/(p_square+q_square)
+
+  return ds
 
 def rank_plays(target_play_index, term_document_matrix, similarity_fn):
   ''' Ranks the similarity of all of the plays to the target play.
@@ -225,7 +242,18 @@ def rank_plays(target_play_index, term_document_matrix, similarity_fn):
   '''
   
   # YOUR CODE HERE
-  return []
+  nums = term_document_matrix.shape[1]
+  target = term_document_matrix.T[target_play_index,:]
+  docs_ranking = {}
+  result = []
+  td_in_cols = term_document_matrix.T
+  for i in range(nums):
+          similarity_doc = similarity_fn(td_in_cols[i,:], target)
+          docs_ranking[i] = similarity_doc
+  sort_ranking = sorted(docs_ranking,reverse=True)
+  for item in sort_ranking:
+      result.append(item[0])
+  return result
 
 def rank_words(target_word_index, matrix, similarity_fn):
   ''' Ranks the similarity of all of the words to the target word.
@@ -241,9 +269,17 @@ def rank_words(target_word_index, matrix, similarity_fn):
     A length-n list of integer word indices, ordered by decreasing similarity to the 
     target word indexed by word_index
   '''
-
   # YOUR CODE HERE
-  return []
+  result =[]
+  nums = matrix.shape[0]
+  target = matrix[target_word_index,:]
+  word_ranking = {}
+  for i in range(nums):
+      word_simi = similarity_fn(matrix[i,:],target)
+      word_ranking[i] = word_simi
+  for item in sorted(word_ranking,reverse=True):
+      result.append(item[0])
+  return result
 
 
 if __name__ == '__main__':
