@@ -113,31 +113,37 @@ def create_term_context_matrix(line_tuples, vocab, context_window_size=1):
 
   return tcm
 
+
 def create_PPMI_matrix(term_context_matrix):
   '''Given a term context matrix, output a PPMI matrix.
-    
+
   Hint: Use numpy matrix and vector operations to speed up implementation.
-  
+
   Input:
     term_context_matrix: A nxn numpy array, where n is
         the numer of tokens in the vocab.
-  
+
   Returns: A nxn numpy matrix, where A_ij is equal to the
      point-wise mutual information between the ith word
      and the jth word in the term_context_matrix.
-  '''       
-  
+  '''
+
   # YOUR CODE HERE
   para = term_context_matrix.shape
-  totals = np.sum(term_context_matrix)
+  tcm = term_context_matrix.copy() + 1
+  n = para[0]
+  totals1 = np.sum(term_context_matrix) + n * n
+  totals = np.tile(totals1, (n, para[1]))
   ppmi = np.zeros(para)
-  rows = np.sum(term_context_matrix,axis=1)
-  cols = np.sum(term_context_matrix,axis=0)
-  for i in range(0,para[0]):
-    for j in range (0,para[1]):
-      ppmi[i][j] = (term_context_matrix[i][j] * totals + 1 ) / ((rows[i] * cols[j]) + totals)
-
-  ppmi_final = np.log2(ppmi)
+  rows1 = np.sum(term_context_matrix, axis=1) + n
+  rows = np.tile(rows1, (n, 1)).T
+  cols1 = np.sum(term_context_matrix, axis=0) + n
+  cols = np.tile(cols1, (n, 1))
+  dom = np.multiply(rows, cols)
+  num = np.multiply(totals, tcm)
+  ppmi_final = np.divide(num, dom)
+  ppmi_final = np.log2(ppmi_final)
+  ppmi_final = np.maximum(ppmi_final, 0)
 
   return ppmi_final
 
@@ -201,10 +207,9 @@ def compute_jaccard_similarity(vector1, vector2):
   
   # YOUR CODE HERE
   # Tanimoto similarity
-  pq = np.dot(vector1,vector2)
-  p_square = LA.norm(vector1)
-  q_square = LA.norm(vector2)
-  js = pq/(p_square+q_square-pq)
+  num = np.minimum(vector1, vector2)
+  dom = np.maximum(vector1, vector2)
+  js = np.sum(num) / np.sum(dom)
   return js
 
 def compute_dice_similarity(vector1, vector2):
@@ -219,12 +224,10 @@ def compute_dice_similarity(vector1, vector2):
   '''
 
   # YOUR CODE HERE
-  pq = np.dot(vector1,vector2)
-  p_square = LA.norm(vector1)
-  q_square = LA.norm(vector2)
-  ds = 2*pq/(p_square+q_square)
-
-  return ds
+  upper = np.minimum(vector1,vector2)
+  upper_sum = np.sum(upper) * 2
+  dom = np.sum(vector1 + vector2)
+  return upper_sum/dom
 
 def rank_plays(target_play_index, term_document_matrix, similarity_fn):
   ''' Ranks the similarity of all of the plays to the target play.
@@ -248,11 +251,12 @@ def rank_plays(target_play_index, term_document_matrix, similarity_fn):
   result = []
   td_in_cols = term_document_matrix.T
   for i in range(nums):
-          similarity_doc = similarity_fn(td_in_cols[i,:], target)
-          docs_ranking[i] = similarity_doc
-  sort_ranking = sorted(docs_ranking,reverse=True)
-  for item in sort_ranking:
-      result.append(item[0])
+          if i!= target_play_index:
+              similarity_doc = similarity_fn(td_in_cols[i,:], target)
+              docs_ranking[i] = similarity_doc
+  sort_ranking = sorted(docs_ranking.items(),key=lambda item: item[1],reverse=True)
+  for k,v in sort_ranking:
+      result.append(k)
   return result
 
 def rank_words(target_word_index, matrix, similarity_fn):
@@ -275,10 +279,11 @@ def rank_words(target_word_index, matrix, similarity_fn):
   target = matrix[target_word_index,:]
   word_ranking = {}
   for i in range(nums):
-      word_simi = similarity_fn(matrix[i,:],target)
-      word_ranking[i] = word_simi
-  for item in sorted(word_ranking,reverse=True):
-      result.append(item[0])
+      if i!= target_word_index:
+        word_simi = similarity_fn(matrix[i,:],target)
+        word_ranking[i] = word_simi
+  for k,v in sorted(word_ranking.items(),key=lambda item: item[1],reverse=True):
+      result.append(k)
   return result
 
 
